@@ -104,6 +104,12 @@ def get_index():
 
 def set_index(index):
     global curr_index
+
+    if index < 0:
+        index = 0
+    if index >= len(image_paths):
+        index = len(image_paths) - 1
+
     curr_index = index
 
 
@@ -158,7 +164,7 @@ with app_context():
 
         viewer.layers[layer_name].image = labels
 
-        msg = "Reverting " + viewer.layers[0].name
+        msg = "Reverting " + viewer.layers[layer_name].name
         print(msg)
         viewer.status = msg
 
