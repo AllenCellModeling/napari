@@ -26,13 +26,6 @@ $ conda activate napari
 $ git clone https://github.com/AllenCellModeling/napari.git
 $ cd napari
 $ pip install -e .
-$ pip install scikit-image
-```
-
-Note that many of our examples use `data` from `skimage` but `skimage` is otherwise not a dependnecy, so to run all the examples you should call
-
-```sh
-$ pip install scikit-image
 ```
 
 ## simple example
