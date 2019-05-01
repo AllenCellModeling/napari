@@ -1,5 +1,7 @@
 #### **_this repo is under development and not stable!_**
 
+A fork of napari/napari intended for use at the Allen Institute for Cell Science. There is no support for this fork in any way shape or form, and instructions or documentation will differ from the official repo.
+
 # napari
 
 ### multi-dimensional image viewer for python
@@ -17,26 +19,14 @@ We're developing **napari** in the open! But the project is in a **pre-alpha** s
 
 ## installation
 
-**napari** can be installed on most Mac OS X and Linux systems with Python 3.6 or 3.7 by calling 
-
+**napari** can be installed on most Mac OS X and Linux systems with Python 3.6 or 3.7 by calling. 
 ```sh
-$ pip install napari
-```
-
-(We're working on adding Windows support.)
-
-To install from the master branch on Github use
-
-```sh
-$ pip install git+https://github.com/napari/napari
-```
-
-To clone the repository locally and install in editable mode use
-
-```sh
-$ git clone https://github.com/napari/napari.git
+$ conda create -n napari python=3.7
+$ conda activate napari
+$ git clone https://github.com/AllenCellModeling/napari.git
 $ cd napari
 $ pip install -e .
+$ pip install scikit-image
 ```
 
 Note that many of our examples use `data` from `skimage` but `skimage` is otherwise not a dependnecy, so to run all the examples you should call
