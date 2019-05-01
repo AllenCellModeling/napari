@@ -7,3 +7,4 @@ qtpy>=1.7.0
 SIP>=0.1.5
 scikit-image
 pandas
+aicsimageio
