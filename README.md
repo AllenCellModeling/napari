@@ -37,26 +37,11 @@ $ pip install scikit-image
 
 ## simple example
 
-From inside an IPython shell or Jupyter notebook you can open up an interactive viewer by calling
+copy the images you want to annotate into `napari/data/`
 
-```python
-%gui qt5
-from skimage import data
-from napari import ViewerApp
-viewer = ViewerApp(data.astronaut())
-```
-
-![image](resources/screenshot-add-image.png)
-
-To do the same thing inside a script call
-
-```python
-from skimage import data
-from napari import ViewerApp
-from napari.util import app_context
-
-with app_context():
-    viewer = ViewerApp(data.astronaut())
+run 
+```sh
+$ python annotator.py
 ```
 
 ## more features
