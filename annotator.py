@@ -150,7 +150,7 @@ with app_context():
         set_index(get_index() - 1)
         load_image(viewer, image_paths[get_index()], annotation_paths[get_index()])
 
-        msg = "Loading " + viewer.layers[0].name
+        msg = "Loading " + image_paths[curr_index]
         print(msg)
         viewer.status = msg
 
