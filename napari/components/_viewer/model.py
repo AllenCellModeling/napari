@@ -4,6 +4,7 @@ from copy import copy
 from itertools import zip_longest
 
 from ...util.event import EmitterGroup, Event
+from .._dims import Dims
 
 
 class Viewer:
@@ -27,15 +28,15 @@ class Viewer:
         These key bindings are executed instead of any layer specific key
         bindings.
     """
-    def __init__(self):
+    def __init__(self, title='napari'):
         super().__init__()
-        from .._layers_list import LayersList
-        from .._dims import Dims
+        from .._layers import Layers
 
         self.events = EmitterGroup(source=self,
                                    auto_connect=True,
                                    status=Event,
                                    help=Event,
+                                   title=Event,
                                    active_markers=Event)
 
         # Initial dimension must be set to at least the number of visible
@@ -43,10 +44,11 @@ class Viewer:
         self.dims = Dims(2)
         self.dims._set_2d_viewing()
 
-        self.layers = LayersList(self)
+        self.layers = Layers()
 
         self._status = 'Ready'
         self._help = ''
+        self._title = title
         self._cursor = 'standard'
         self._cursor_size = None
         self._interactive = True
@@ -58,6 +60,12 @@ class Viewer:
         self._qtviewer = None
 
         self.dims.events.axis.connect(lambda e: self._update_layers())
+        self.layers.events.added.connect(self._on_layers_change)
+        self.layers.events.removed.connect(self._on_layers_change)
+        self.layers.events.added.connect(self._update_layer_selection)
+        self.layers.events.removed.connect(self._update_layer_selection)
+        self.layers.events.reordered.connect(self._update_layer_selection)
+        self.layers.events.reordered.connect(lambda e: self._update_canvas())
 
     @property
     def _canvas(self):
@@ -99,6 +107,19 @@ class Viewer:
             return
         self._help = help
         self.events.help(text=self._help)
+
+    @property
+    def title(self):
+        """string: String that is displayed in window title.
+        """
+        return self._title
+
+    @title.setter
+    def title(self, title):
+        if title == self.title:
+            return
+        self._title = title
+        self.events.title(text=self._title)
 
     @property
     def interactive(self):
@@ -190,7 +211,10 @@ class Viewer:
         layer : Layer
             Layer to add.
         """
+        layer.events.select.connect(self._update_layer_selection)
+        layer.events.deselect.connect(self._update_layer_selection)
         self.layers.append(layer)
+        layer.viewer = self
         if len(self.layers) == 1:
             self.reset_view()
 
@@ -277,3 +301,10 @@ class Viewer:
                 max_dims = dims
 
         return max_dims
+
+    def _update_canvas(self):
+        """Clears draw order and refreshes canvas. Usefeul for when layers are
+        reoredered.
+        """
+        self._canvas._draw_order.clear()
+        self._canvas.update()
