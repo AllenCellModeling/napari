@@ -21,9 +21,10 @@ class Window:
     """
     def __init__(self, viewer, show=True):
         self._qt_window = QMainWindow()
+        self._qt_window.setUnifiedTitleAndToolBarOnMac(True)
         self._qt_center = QWidget()
         self._qt_window.setCentralWidget(self._qt_center)
-        self._qt_window.setWindowTitle('napari')
+        self._qt_window.setWindowTitle(viewer.title)
         self._qt_center.setLayout(QHBoxLayout())
         self._status_bar = self._qt_window.statusBar()
         self._status_bar.showMessage('Ready')
@@ -42,6 +43,7 @@ class Window:
 
         self.viewer.events.status.connect(self._status_changed)
         self.viewer.events.help.connect(self._help_changed)
+        self.viewer.events.title.connect(self._title_changed)
 
         if show:
             self.show()
@@ -69,6 +71,11 @@ class Window:
         """Update status bar.
         """
         self._status_bar.showMessage(event.text)
+
+    def _title_changed(self, event):
+        """Update window title.
+        """
+        self._qt_window.setWindowTitle(event.text)
 
     def _help_changed(self, event):
         """Update help message on status bar.
