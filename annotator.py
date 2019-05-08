@@ -9,13 +9,16 @@ import numpy as np
 from skimage.io import imread, imsave
 import os
 from glob import glob
-from napari import ViewerApp
-from napari.util import app_context
 from os.path import isfile
 import warnings
 from vispy.color import Colormap
+from natsort import natsorted
 
 import aicsimageio.cziReader as cziReader
+
+from napari import ViewerApp
+from napari.util import app_context
+import napari.layers._labels_layer._constants as layer_constants
 
 
 def get_default_range(image, mode):
@@ -28,51 +31,6 @@ def get_default_range(image, mode):
         hb = np.percentile(image, 99.5)
 
     return lb, hb
-
-
-def load_image(viewer, im_path, im_labels_path):
-    with cziReader.CziReader(im_path) as reader:
-        cells = reader.load()[0]
-
-    layer_names = [layer.name for layer in viewer.layers]
-
-    ch_nums = [1, 2, 3, 4, 0]
-    ch_names = ["red spots", "structure", "yellow spots", "DNA", "brightfield"]
-    ch_types = ["fluor", "fluor", "fluor", "fluor", "bf"]
-    ch_colors = [
-        [1.0, 0.0, 0.0, 1.0],
-        [0.0, 1.0, 0.0, 1.0],
-        [1.0, 1.0, 0.0, 1.0],
-        [0.0, 0.0, 1.0, 1.0],
-        [1.0, 1.0, 1.0, 1.0],
-    ]
-
-    for ch_num, ch_name, ch_type, ch_color in zip(
-        ch_nums, ch_names, ch_types, ch_colors
-    ):
-        if ch_name not in layer_names:
-            ch = viewer.add_image(cells[:, ch_num, :, :], name=ch_name)
-        else:
-            ch = viewer.layers[ch_name]
-            ch.image = cells[:, ch_num, :, :]
-
-        ch.colormap = Colormap([(0, 0, 0, 1), ch_color])
-        ch.clim = get_default_range(cells[:, ch_num, :, :], ch_type)
-        ch.blending = "additive"
-
-    # for this case, annotations are only 2D
-    if os.path.exists(im_labels_path):
-        labels = imread(im_labels_path)
-    else:
-        labels = np.zeros(cells[0, 0, :, :].shape, dtype=np.int)
-
-    if "annotations" not in layer_names:
-        annotations_layer = viewer.add_labels(labels, name="annotations", opacity=0.75)
-    else:
-        annotations_layer = viewer.layers["annotations"]
-        annotations_layer.image = labels
-
-    annotations_layer.n_dimensional = False
 
 
 skimage_save_warning = "'%s is a low contrast image' % fname"
@@ -89,13 +47,17 @@ save_dir = "./annotations/"
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-image_paths = glob("{}/*.czi".format(im_dir))
+image_paths = natsorted(glob("{}/*.czi".format(im_dir)))
 annotation_paths = [
     "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
     for image_path in image_paths
 ]
 
 curr_index = 0
+
+
+def get_max_index():
+    return len(image_paths)
 
 
 def get_index():
@@ -107,8 +69,8 @@ def set_index(index):
 
     if index < 0:
         index = 0
-    if index >= len(image_paths):
-        index = len(image_paths) - 1
+    if index >= get_max_index():
+        index = get_max_index() - 1
 
     curr_index = index
 
@@ -116,9 +78,6 @@ def set_index(index):
 with app_context():
     # create an empty viewer
     viewer = ViewerApp()
-
-    # add the first image
-    load_image(viewer, image_paths[curr_index], annotation_paths[curr_index])
 
     def save(viewer, layer_name="annotations"):
         """Save the current annotations
@@ -128,7 +87,7 @@ with app_context():
         imsave(save_path, labels, plugin="tifffile", photometric="minisblack")
         msg = "Saving " + viewer.layers[layer_name].name + ": " + save_path
         print(msg)
-        viewer.status = msg
+        # viewer.status = msg
 
     def next(viewer):
         """Save the current annotation and load the next image and annotation
@@ -140,7 +99,7 @@ with app_context():
 
         msg = "Loading " + image_paths[curr_index]
         print(msg)
-        viewer.status = msg
+        # viewer.status = msg
 
     def previous(viewer):
         """Save the current annotation and load the previous image and annotation
@@ -152,7 +111,7 @@ with app_context():
 
         msg = "Loading " + image_paths[curr_index]
         print(msg)
-        viewer.status = msg
+        # viewer.status = msg
 
     def revert(viewer, layer_name="annotations"):
         """Loads the last saved annotation
@@ -166,7 +125,7 @@ with app_context():
 
         msg = "Reverting " + viewer.layers[layer_name].name
         print(msg)
-        viewer.status = msg
+        # viewer.status = msg
 
     def increment_label(viewer, layer_name="annotations"):
         """Increments current label
@@ -191,6 +150,67 @@ with app_context():
         """
         label = viewer.layers[layer_name]._image_view.max()
         viewer.layers[layer_name].selected_label = label + 1
+
+    def load_image(viewer, im_path, im_labels_path):
+        with cziReader.CziReader(im_path) as reader:
+            cells = reader.load()[0]
+
+        layer_names = [layer.name for layer in viewer.layers]
+
+        ch_nums = [1, 2, 3, 4, 0]
+        ch_names = ["red spots", "structure", "yellow spots", "DNA", "brightfield"]
+        ch_types = ["fluor", "fluor", "fluor", "fluor", "bf"]
+        ch_colors = [
+            [1.0, 0.0, 0.0, 1.0],
+            [0.0, 1.0, 0.0, 1.0],
+            [1.0, 1.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0, 1.0],
+            [1.0, 1.0, 1.0, 1.0],
+        ]
+
+        for ch_num, ch_name, ch_type, ch_color in zip(
+            ch_nums, ch_names, ch_types, ch_colors
+        ):
+            if ch_name not in layer_names:
+                ch = viewer.add_image(cells[:, ch_num, :, :], name=ch_name)
+            else:
+                ch = viewer.layers[ch_name]
+                ch.image = cells[:, ch_num, :, :]
+
+            ch.colormap = Colormap([(0, 0, 0, 1), ch_color])
+            ch.clim = get_default_range(cells[:, ch_num, :, :], ch_type)
+            ch.blending = "additive"
+
+        # for this case, annotations are only 2D
+        if os.path.exists(im_labels_path):
+            labels = imread(im_labels_path)
+        else:
+            labels = np.zeros(cells[0, 0, :, :].shape, dtype=np.int)
+
+        if "annotations" not in layer_names:
+            annotations_layer = viewer.add_labels(
+                labels, name="annotations", opacity=0.75
+            )
+        else:
+            annotations_layer = viewer.layers["annotations"]
+            annotations_layer.image = labels
+
+        annotations_layer.n_dimensional = False
+
+        if annotations_layer.mode == layer_constants.Mode.FILL:
+            annotations_layer.mode = layer_constants.Mode.PAINT
+            viewer.status = "Switched to paint mode for your safety."
+
+        max_label(viewer)
+
+        display_string = "{}/{}: {}".format(get_index(), get_max_index(), im_path)
+        # msg = "Saving " + viewer.layers[layer_name].name + ": " + save_path
+        # print(msg)
+        # viewer.status = display_string
+        viewer.title = display_string
+
+    # add the first image
+    load_image(viewer, image_paths[curr_index], annotation_paths[curr_index])
 
     custom_key_bindings = {
         "s": save,
