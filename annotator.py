@@ -13,12 +13,109 @@ from os.path import isfile
 import warnings
 from vispy.color import Colormap
 from natsort import natsorted
+import argparse
+import pandas as pd
+import shutil
+import tqdm
 
 import aicsimageio.cziReader as cziReader
 
 from napari import ViewerApp
 from napari.util import app_context
 import napari.layers._labels_layer._constants as layer_constants
+
+
+def str2bool(v):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
+parser = argparse.ArgumentParser(description="Annotator for GE/SCE")
+parser.add_argument(
+    "--start_from_last_annotation",
+    default=True,
+    type=str2bool,
+    help="Start from last annotation",
+)
+parser.add_argument(
+    "--save_if_empty",
+    default=False,
+    type=str2bool,
+    help="Save annotation layer if it is empty",
+)
+parser.add_argument("--data_dir", type=str, default="./data/")
+parser.add_argument(
+    "--copy_to_local", type=str2bool, default=True, help="Copy images to local first"
+)
+
+args = parser.parse_args()
+print(args)
+
+df = pd.read_csv("{}/napari_annotation_files.csv".format(args.data_dir))
+
+
+def find_nth(haystack, needle, n):
+    start = haystack.find(needle)
+    while start >= 0 and n > 1:
+        start = haystack.find(needle, start + len(needle))
+        n -= 1
+    return start
+
+
+if args.copy_to_local:
+    im_dir = "{}/images/".format(args.data_dir)
+    if not os.path.exists(im_dir):
+        os.makedirs(im_dir)
+
+    image_paths = np.array(
+        [
+            "./data/images/{}".format(os.path.basename(file_path))
+            for file_path in df.file_path
+        ]
+    )
+
+    for i in tqdm.tqdm(range(len(df.file_path))):
+
+        if not os.path.exists(image_paths[i]):
+            shutil.copyfile(
+                df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
+            )
+
+else:
+    image_paths = df.file_path
+
+
+ref_files = image_paths[df.set == "reference"]
+annotate_files = image_paths[df.set == "annotate"]
+np.random.shuffle(annotate_files)
+
+image_paths = np.concatenate([ref_files, annotate_files])
+
+
+save_dir = "{}/save_dir/".format(args.data_dir)
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
+
+
+annotation_paths = [
+    "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
+    for image_path in image_paths
+]
+
+if not args.start_from_last_annotation:
+    curr_index = 0
+else:
+    missing_files = ~np.array(
+        [os.path.exists(annotation_path) for annotation_path in annotation_paths]
+    )
+    if not np.any(missing_files):
+        curr_index = len(annotation_paths) - 1
+    else:
+        curr_index = np.where(missing_files)[0][0]
 
 
 def get_default_range(image, mode):
@@ -39,21 +136,6 @@ with warnings.catch_warnings():
     warnings.filterwarnings(
         "ignore", category=UserWarning, message=skimage_save_warning
     )
-
-## Preliminary testing. Change this later
-im_dir = "./data/"
-save_dir = "./annotations/"
-
-if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
-
-image_paths = natsorted(glob("{}/*.czi".format(im_dir)))
-annotation_paths = [
-    "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
-    for image_path in image_paths
-]
-
-curr_index = 0
 
 
 def get_max_index():
@@ -83,11 +165,20 @@ with app_context():
         """Save the current annotations
         """
         labels = viewer.layers[layer_name].image.astype(np.uint16)
+
+        if (not args.save_if_empty) and np.all(labels == 0):
+            msg = "{} layer is empty. save_if_empty set to False.".format(
+                viewer.layers[layer_name].name
+            )
+            print(msg)
+            viewer.status = msg
+            return
+
         save_path = annotation_paths[curr_index]
         imsave(save_path, labels, plugin="tifffile", photometric="minisblack")
         msg = "Saving " + viewer.layers[layer_name].name + ": " + save_path
         print(msg)
-        # viewer.status = msg
+        viewer.status = msg
 
     def next(viewer):
         """Save the current annotation and load the next image and annotation
@@ -99,7 +190,7 @@ with app_context():
 
         msg = "Loading " + image_paths[curr_index]
         print(msg)
-        # viewer.status = msg
+        viewer.status = msg
 
     def previous(viewer):
         """Save the current annotation and load the previous image and annotation
@@ -111,7 +202,7 @@ with app_context():
 
         msg = "Loading " + image_paths[curr_index]
         print(msg)
-        # viewer.status = msg
+        viewer.status = msg
 
     def revert(viewer, layer_name="annotations"):
         """Loads the last saved annotation

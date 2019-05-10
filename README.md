@@ -36,7 +36,12 @@ $ pip install scikit-image
 
 ## simple example
 
-copy the images you want to annotate into `napari/data/`
+The code is set up to copy the files over to your computer first. Please make sure you XXX gb of space free before you start.
+
+First start finder and press ⌘ + k to bring up the "Connect to Server" menu. Enter `smb://allen` and mount the `aics` drive. This allows us to automagically copy files over from the file system.
+
+Then start the app. It should start copying over files for you. Once this is done, you should be able to disconnect from the network an annotate stuff remotely. Those results will be saved to your harddrive in the `./data/annotations folder`.
+
 
 run 
 ```sh
