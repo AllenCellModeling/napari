@@ -245,6 +245,10 @@ with app_context():
         viewer.layers[layer_name].selected_label = label + 1
 
     def load_image(viewer, im_path, im_labels_path):
+        message = "Reading image {}".format(im_path)
+        viewer.status = message
+        print(message)
+
         with cziReader.CziReader(im_path) as reader:
             cells = reader.load()[0]
 
