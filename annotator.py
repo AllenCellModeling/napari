@@ -86,7 +86,9 @@ if args.copy_to_local:
             )
 
 else:
-    image_paths = df.file_path
+    image_paths = np.array(
+        [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
+    )
 
 
 ref_files = image_paths[df.set == "reference"]
