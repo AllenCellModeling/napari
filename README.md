@@ -42,6 +42,11 @@ run
 $ python annotator.py
 ```
 
+If you dont want to copy over files run for whatever reason do
+```sh
+$ python annotator.py --copy_to_local false
+```
+
 ## features
 
 Check out the scripts in the `examples` folder to see some of the functionality we're developing!
