@@ -17,6 +17,7 @@ import argparse
 import pandas as pd
 import shutil
 import tqdm
+import json
 
 import aicsimageio.cziReader as cziReader
 
@@ -34,46 +35,89 @@ def str2bool(v):
         raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
+def save_load_dict(args, save_path):
+    # saves a dictionary, 'args', as a json file. Or loads if it exists.
+
+    if os.path.exists(save_path):
+        warnings.warn(
+            "Preference file exists at {}. Using existing args file.".format(save_path)
+        )
+
+        # load file
+        with open(save_path, "rb") as f:
+            args = json.load(f)
+    else:
+
+        with open(save_path, "w") as f:
+            json.dump(args, f, indent=4, sort_keys=True)
+
+    return args
+
+
+def check_keys(args, required_keys, error_message):
+    missing_keys = [key not in args for key in required_keys]
+
+    if np.any(missing_keys):
+        raise KeyError(error_message.format(required_keys[missing_keys]))
+
+    return missing_keys
+
+
 parser = argparse.ArgumentParser(description="Annotator for GE/SCE")
+
 parser.add_argument(
-    "--start_from_last_annotation",
-    default=True,
-    type=str2bool,
-    help="Start from last annotation",
-)
-parser.add_argument(
-    "--save_if_empty",
-    default=False,
-    type=str2bool,
-    help="Save annotation layer if it is empty",
-)
-parser.add_argument("--data_dir", type=str, default="./data/")
-parser.add_argument(
-    "--copy_to_local", type=str2bool, default=True, help="Copy images to local first"
+    "--prefs_path", type=str, default="./data/experiment.json", help="Experiment file"
 )
 
 args = parser.parse_args()
 print(args)
 
-df = pd.read_csv("{}/napari_annotation_files.csv".format(args.data_dir))
+with open(args.prefs_path, "rb") as f:
+    args = json.load(f)
 
 
-def find_nth(haystack, needle, n):
-    start = haystack.find(needle)
-    while start >= 0 and n > 1:
-        start = haystack.find(needle, start + len(needle))
-        n -= 1
-    return start
+missing_keys = check_keys(
+    args,
+    required_keys=np.array(
+        [
+            "annotator",
+            "data_csv",
+            "data_dir_local",
+            "save_dir",
+            "start_from_last_annotation",
+            "save_if_empty",
+        ]
+    ),
+    error_message="The following fields are missing from the preferences_file: {}",
+)
+
+start_from_last_annotation = args["start_from_last_annotation"]
+save_if_empty = args["save_if_empty"]
+
+save_dir = args["save_dir"]
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
 
 
-if args.copy_to_local:
-    im_dir = "{}/images/".format(args.data_dir)
-    if not os.path.exists(im_dir):
-        os.makedirs(im_dir)
+args = save_load_dict(args, "{}/experiment.json".format(args["save_dir"]))
+
+
+df = pd.read_csv(args["data_csv"])
+
+missing_keys = check_keys(
+    df,
+    required_keys=np.array(["file_path", "set"]),
+    error_message="The following fields are missing from the data_csv: {}",
+)
+
+data_dir_local = args["data_dir_local"]
+if data_dir_local is not None:
+    if not os.path.exists(data_dir_local):
+        os.makedirs(data_dir_local)
 
     image_paths = np.array(
         [
-            "./data/images/{}".format(os.path.basename(file_path))
+            "{}/{}".format(data_dir_local, os.path.basename(file_path))
             for file_path in df.file_path
         ]
     )
@@ -98,17 +142,12 @@ np.random.shuffle(annotate_files)
 image_paths = np.concatenate([ref_files, annotate_files])
 
 
-save_dir = "{}/save_dir/".format(args.data_dir)
-if not os.path.exists(save_dir):
-    os.makedirs(save_dir)
-
-
 annotation_paths = [
     "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
     for image_path in image_paths
 ]
 
-if not args.start_from_last_annotation:
+if not start_from_last_annotation:
     curr_index = 0
 else:
     missing_files = ~np.array(
@@ -168,7 +207,7 @@ with app_context():
         """
         labels = viewer.layers[layer_name].image.astype(np.uint16)
 
-        if (not args.save_if_empty) and np.all(labels == 0):
+        if (not save_if_empty) and np.all(labels == 0):
             msg = "{} layer is empty. save_if_empty set to False.".format(
                 viewer.layers[layer_name].name
             )
@@ -249,8 +288,13 @@ with app_context():
         viewer.status = message
         print(message)
 
-        with cziReader.CziReader(im_path) as reader:
-            cells = reader.load()[0]
+        try:
+            with cziReader.CziReader(im_path) as reader:
+                cells = reader.load()[0]
+
+        except:
+            cells = imread(im_path)
+            cells = np.expand_dims(cells, 0)
 
         layer_names = [layer.name for layer in viewer.layers]
 
@@ -305,6 +349,12 @@ with app_context():
         # print(msg)
         # viewer.status = display_string
         viewer.title = display_string
+
+        viewer._on_layers_change(None)
+
+        # import pdb
+
+        # pdb.set_trace()
 
     # add the first image
     load_image(viewer, image_paths[curr_index], annotation_paths[curr_index])

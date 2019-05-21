@@ -1,0 +1,8 @@
+{
+	"annotator": "user",
+	"data_csv": "./data/20190520_napari_annotation_files.csv",
+	"data_dir_local": "./data/images",
+	"save_dir": "./data/annotations",
+	"start_from_last_annotation": 1,
+	"save_if_empty": 0
+}

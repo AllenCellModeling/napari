@@ -31,20 +31,38 @@ $ pip install -e .
 
 ## HOW TO RUN
 
-The code is set up to copy the files over to your computer first. __Please make sure you have 21 gb of space free for images before you start__. 
+### Default Usage:
+
+The code is set up with useful defaults and is configured to to copy the files over to your computer first. __Please make sure you have 27.9 gb of space free for images before you start__. 
 
 First start finder and press ⌘ + k to bring up the "Connect to Server" menu. Enter `smb://allen` and mount the `aics` drive. This allows us to automagically copy files over from the file system.
 
 Then start the app. It should start copying over files for you. Once this is done, you should be able to disconnect from the network an annotate stuff remotely. Those results will be saved to your harddrive in the `./data/annotations folder`.
 
-run 
+After the `napari` environment is activated in conda, run the following command in the Teriminal app:
 ```sh
 $ python annotator.py
 ```
 
-If you dont want to copy over files run for whatever reason do
+### Advanced Usage:
+
+By default the code uses a .json file that lives in `./data/experiment.json`. That file looks like this:
+```
+{
+	"annotator": "user",
+	"data_csv": "./data/20190520_napari_annotation_files.csv",
+	"data_dir_local": "./data/images",
+	"save_dir": "./data/annotations",
+	"start_from_last_annotation": 1,
+	"save_if_empty": 0
+}
+```
+These parameters should be self explanatory. Please change this configuration to suit your needs. 
+
+To run the annotator with a different .json file do:
+
 ```sh
-$ python annotator.py --copy_to_local false
+$ python annotator.py --prefs_path "/path/to/your/file.json"
 ```
 
 ## features
