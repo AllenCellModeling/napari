@@ -86,6 +86,7 @@ missing_keys = check_keys(
             "save_dir",
             "start_from_last_annotation",
             "save_if_empty",
+            "os"
         ]
     ),
     error_message="The following fields are missing from the preferences_file: {}",
@@ -111,6 +112,8 @@ missing_keys = check_keys(
 )
 
 data_dir_local = args["data_dir_local"]
+operating_system = args["os"]
+
 if data_dir_local is not None:
     if not os.path.exists(data_dir_local):
         os.makedirs(data_dir_local)
@@ -125,15 +128,29 @@ if data_dir_local is not None:
     for i in tqdm.tqdm(range(len(df.file_path))):
 
         if not os.path.exists(image_paths[i]):
-            shutil.copyfile(
-                df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
-            )
+            if operating_system == "mac":
+                shutil.copyfile(
+                    df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
+                )
+            elif operating_system == "linux":
+                shutil.copyfile(
+                    df.file_path[i], image_paths[i]
+                )
+            else:
+                raise TypeError("mac and linux are only allowed operating systems")
+
 
 else:
-    image_paths = np.array(
-        [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
-    )
-
+    if operating_system == "mac":
+        image_paths = np.array(
+            [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
+        )
+    elif operating_system == "linux":
+        image_paths = np.array(
+            [file_path for file_path in df.file_path]
+        )
+    else:
+        raise TypeError("mac and linux are only allowed operating systems")
 
 ref_files = image_paths[df.set == "reference"]
 annotate_files = image_paths[df.set == "annotate"]
@@ -141,9 +158,10 @@ np.random.shuffle(annotate_files)
 
 image_paths = np.concatenate([ref_files, annotate_files])
 
+annotator = args["annotator"]
 
 annotation_paths = [
-    "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
+    "{}/annotation_{}.{}.tiff".format(save_dir, os.path.basename(image_path), annotator)
     for image_path in image_paths
 ]
 
