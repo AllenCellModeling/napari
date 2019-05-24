@@ -19,7 +19,7 @@ import shutil
 import tqdm
 import json
 
-import aicsimageio.cziReader as cziReader
+from aicsimageio import AICSImage
 
 from napari import ViewerApp
 from napari.util import app_context
@@ -288,13 +288,17 @@ with app_context():
         viewer.status = message
         print(message)
 
-        try:
-            with cziReader.CziReader(im_path) as reader:
-                cells = reader.load()[0]
+        img = AICSImage(im_path)
+        cells = img.data[0]
 
-        except:
-            cells = imread(im_path)
-            cells = np.expand_dims(cells, 0)
+        print("image shape: {}".format(cells.shape))
+
+        # if cells.shape[0] == 1:
+        #     im_out_size = list(cells.shape)
+        #     im_out_size[0] = 5
+        #     cells_tmp = np.zeros(im_out_size)
+        #     cells_tmp[0] = cells[0]
+        #     cells = cells_tmp
 
         layer_names = [layer.name for layer in viewer.layers]
 
@@ -312,14 +316,19 @@ with app_context():
         for ch_num, ch_name, ch_type, ch_color in zip(
             ch_nums, ch_names, ch_types, ch_colors
         ):
+            if ch_num < cells.shape[0]:
+                channel = cells[ch_num, :, :, :]
+            else:
+                channel = np.zeros([1, 1, 1])
+
             if ch_name not in layer_names:
-                ch = viewer.add_image(cells[:, ch_num, :, :], name=ch_name)
+                ch = viewer.add_image(channel, name=ch_name)
             else:
                 ch = viewer.layers[ch_name]
-                ch.image = cells[:, ch_num, :, :]
+                ch.image = channel
 
             ch.colormap = Colormap([(0, 0, 0, 1), ch_color])
-            ch.clim = get_default_range(cells[:, ch_num, :, :], ch_type)
+            ch.clim = get_default_range(channel, ch_type)
             ch.blending = "additive"
 
         # for this case, annotations are only 2D
@@ -344,7 +353,7 @@ with app_context():
 
         max_label(viewer)
 
-        display_string = "{}/{}: {}".format(get_index(), get_max_index(), im_path)
+        display_string = "{}/{}: {}".format(get_index() + 1, get_max_index(), im_path)
         # msg = "Saving " + viewer.layers[layer_name].name + ": " + save_path
         # print(msg)
         # viewer.status = display_string
