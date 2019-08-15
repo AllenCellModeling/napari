@@ -3,7 +3,6 @@ from skimage.io import imread, imsave
 import os
 
 from vispy.color import Colormap
-from aicsimageio import AICSImage
 import aicsimageio
 
 from napari import ViewerApp
@@ -123,7 +122,7 @@ def assay_dev_images_downsampled(viewer, im_path, im_labels_path):
 
 
 def microscopy_czi(viewer, im_path, im_labels_path):
-    img = AICSImage(im_path)
+    img = aicsimageio.AICSImage(im_path)
     cells = img.data[0]
 
     print("image shape: {}".format(cells.shape))
@@ -131,7 +130,7 @@ def microscopy_czi(viewer, im_path, im_labels_path):
     layer_names = [layer.name for layer in viewer.layers]
 
     ch_nums = [1, 2, 3, 4, 0]
-    ch_names = ["red spots", "structure", "yellow spots", "DNA", "brightfield"]
+    ch_names = ["probe488", "probe561", "probe638", "dapi", "brightfield"]
     ch_types = ["fluor", "fluor", "fluor", "fluor", "bf"]
     ch_colors = [
         [1.0, 0.0, 0.0, 1.0],

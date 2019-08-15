@@ -19,8 +19,7 @@ import shutil
 import tqdm
 import json
 
-from aicsimageio import AICSImage
-import aicsimageio
+# import aicsimageio
 
 from napari import ViewerApp
 from napari.util import app_context
