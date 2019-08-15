@@ -19,11 +19,14 @@ import shutil
 import tqdm
 import json
 
-import aicsimageio.cziReader as cziReader
+from aicsimageio import AICSImage
+import aicsimageio
 
 from napari import ViewerApp
 from napari.util import app_context
 import napari.layers._labels_layer._constants as layer_constants
+
+import image_loader
 
 
 def str2bool(v):
@@ -86,7 +89,8 @@ missing_keys = check_keys(
             "save_dir",
             "start_from_last_annotation",
             "save_if_empty",
-            "os"
+            "os",
+            "im_loader"
         ]
     ),
     error_message="The following fields are missing from the preferences_file: {}",
@@ -98,6 +102,8 @@ save_if_empty = args["save_if_empty"]
 save_dir = args["save_dir"]
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
+
+im_loader = getattr(image_loader, args["im_loader"])
 
 
 args = save_load_dict(args, "{}/experiment.json".format(args["save_dir"]))
@@ -117,6 +123,9 @@ operating_system = args["os"]
 if data_dir_local is not None:
     if not os.path.exists(data_dir_local):
         os.makedirs(data_dir_local)
+    print(df)
+    for file_path in df.file_path:
+        print(file_path)
 
     image_paths = np.array(
         [
@@ -130,7 +139,7 @@ if data_dir_local is not None:
         if not os.path.exists(image_paths[i]):
             if operating_system == "mac":
                 shutil.copyfile(
-                    df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
+                    df.file_path[i].replace("/allen/", "/media/tanyag/"), image_paths[i]
                 )
             elif operating_system == "linux":
                 shutil.copyfile(
@@ -143,7 +152,7 @@ if data_dir_local is not None:
 else:
     if operating_system == "mac":
         image_paths = np.array(
-            [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
+            [file_path.replace("/allen/", "/media/tanyag/") for file_path in df.file_path]
         )
     elif operating_system == "linux":
         image_paths = np.array(
@@ -158,10 +167,8 @@ np.random.shuffle(annotate_files)
 
 image_paths = np.concatenate([ref_files, annotate_files])
 
-annotator = args["annotator"]
-
 annotation_paths = [
-    "{}/annotation_{}.{}.tiff".format(save_dir, os.path.basename(image_path), annotator)
+    "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
     for image_path in image_paths
 ]
 
@@ -306,45 +313,7 @@ with app_context():
         viewer.status = message
         print(message)
 
-        try:
-            with cziReader.CziReader(im_path) as reader:
-                cells = reader.load()[0]
-
-        except:
-            cells = imread(im_path)
-            cells = np.expand_dims(cells, 0)
-
-        layer_names = [layer.name for layer in viewer.layers]
-
-        ch_nums = [1, 2, 3, 4, 0]
-        ch_names = ["red spots", "structure", "yellow spots", "DNA", "brightfield"]
-        ch_types = ["fluor", "fluor", "fluor", "fluor", "bf"]
-        ch_colors = [
-            [1.0, 0.0, 0.0, 1.0],
-            [0.0, 1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0, 1.0],
-            [0.0, 0.0, 1.0, 1.0],
-            [1.0, 1.0, 1.0, 1.0],
-        ]
-
-        for ch_num, ch_name, ch_type, ch_color in zip(
-            ch_nums, ch_names, ch_types, ch_colors
-        ):
-            if ch_name not in layer_names:
-                ch = viewer.add_image(cells[:, ch_num, :, :], name=ch_name)
-            else:
-                ch = viewer.layers[ch_name]
-                ch.image = cells[:, ch_num, :, :]
-
-            ch.colormap = Colormap([(0, 0, 0, 1), ch_color])
-            ch.clim = get_default_range(cells[:, ch_num, :, :], ch_type)
-            ch.blending = "additive"
-
-        # for this case, annotations are only 2D
-        if os.path.exists(im_labels_path):
-            labels = imread(im_labels_path)
-        else:
-            labels = np.zeros(cells[0, 0, :, :].shape, dtype=np.int)
+        viewer, layer_names, labels = im_loader(viewer, im_path, im_labels_path)
 
         if "annotations" not in layer_names:
             annotations_layer = viewer.add_labels(
@@ -362,7 +331,7 @@ with app_context():
 
         max_label(viewer)
 
-        display_string = "{}/{}: {}".format(get_index(), get_max_index(), im_path)
+        display_string = "{}/{}: {}".format(get_index() + 1, get_max_index(), im_path)
         # msg = "Saving " + viewer.layers[layer_name].name + ": " + save_path
         # print(msg)
         # viewer.status = display_string
