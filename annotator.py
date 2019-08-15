@@ -19,7 +19,6 @@ import shutil
 import tqdm
 import json
 
-# import aicsimageio
 
 from napari import ViewerApp
 from napari.util import app_context
@@ -122,9 +121,6 @@ operating_system = args["os"]
 if data_dir_local is not None:
     if not os.path.exists(data_dir_local):
         os.makedirs(data_dir_local)
-    print(df)
-    for file_path in df.file_path:
-        print(file_path)
 
     image_paths = np.array(
         [
@@ -138,7 +134,7 @@ if data_dir_local is not None:
         if not os.path.exists(image_paths[i]):
             if operating_system == "mac":
                 shutil.copyfile(
-                    df.file_path[i].replace("/allen/", "/media/tanyag/"), image_paths[i]
+                    df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
                 )
             elif operating_system == "linux":
                 shutil.copyfile(
@@ -151,7 +147,7 @@ if data_dir_local is not None:
 else:
     if operating_system == "mac":
         image_paths = np.array(
-            [file_path.replace("/allen/", "/media/tanyag/") for file_path in df.file_path]
+            [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
         )
     elif operating_system == "linux":
         image_paths = np.array(
