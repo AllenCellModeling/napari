@@ -19,11 +19,12 @@ import shutil
 import tqdm
 import json
 
-from aicsimageio import AICSImage
 
 from napari import ViewerApp
 from napari.util import app_context
 import napari.layers._labels_layer._constants as layer_constants
+
+import image_loader
 
 
 def str2bool(v):
@@ -86,6 +87,8 @@ missing_keys = check_keys(
             "save_dir",
             "start_from_last_annotation",
             "save_if_empty",
+            "os",
+            "im_loader"
         ]
     ),
     error_message="The following fields are missing from the preferences_file: {}",
@@ -97,6 +100,8 @@ save_if_empty = args["save_if_empty"]
 save_dir = args["save_dir"]
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
+
+im_loader = getattr(image_loader, args["im_loader"])
 
 
 args = save_load_dict(args, "{}/experiment.json".format(args["save_dir"]))
@@ -111,6 +116,8 @@ missing_keys = check_keys(
 )
 
 data_dir_local = args["data_dir_local"]
+operating_system = args["os"]
+
 if data_dir_local is not None:
     if not os.path.exists(data_dir_local):
         os.makedirs(data_dir_local)
@@ -125,22 +132,35 @@ if data_dir_local is not None:
     for i in tqdm.tqdm(range(len(df.file_path))):
 
         if not os.path.exists(image_paths[i]):
-            shutil.copyfile(
-                df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
-            )
+            if operating_system == "mac":
+                shutil.copyfile(
+                    df.file_path[i].replace("/allen/", "/Volumes/"), image_paths[i]
+                )
+            elif operating_system == "linux":
+                shutil.copyfile(
+                    df.file_path[i], image_paths[i]
+                )
+            else:
+                raise TypeError("mac and linux are only allowed operating systems")
+
 
 else:
-    image_paths = np.array(
-        [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
-    )
-
+    if operating_system == "mac":
+        image_paths = np.array(
+            [file_path.replace("/allen/", "/Volumes/") for file_path in df.file_path]
+        )
+    elif operating_system == "linux":
+        image_paths = np.array(
+            [file_path for file_path in df.file_path]
+        )
+    else:
+        raise TypeError("mac and linux are only allowed operating systems")
 
 ref_files = image_paths[df.set == "reference"]
 annotate_files = image_paths[df.set == "annotate"]
 np.random.shuffle(annotate_files)
 
 image_paths = np.concatenate([ref_files, annotate_files])
-
 
 annotation_paths = [
     "{}/annotation_{}.tiff".format(save_dir, os.path.basename(image_path))
@@ -288,54 +308,7 @@ with app_context():
         viewer.status = message
         print(message)
 
-        img = AICSImage(im_path)
-        cells = img.data[0]
-
-        print("image shape: {}".format(cells.shape))
-
-        # if cells.shape[0] == 1:
-        #     im_out_size = list(cells.shape)
-        #     im_out_size[0] = 5
-        #     cells_tmp = np.zeros(im_out_size)
-        #     cells_tmp[0] = cells[0]
-        #     cells = cells_tmp
-
-        layer_names = [layer.name for layer in viewer.layers]
-
-        ch_nums = [1, 2, 3, 4, 0]
-        ch_names = ["red spots", "structure", "yellow spots", "DNA", "brightfield"]
-        ch_types = ["fluor", "fluor", "fluor", "fluor", "bf"]
-        ch_colors = [
-            [1.0, 0.0, 0.0, 1.0],
-            [0.0, 1.0, 0.0, 1.0],
-            [1.0, 1.0, 0.0, 1.0],
-            [0.0, 0.0, 1.0, 1.0],
-            [1.0, 1.0, 1.0, 1.0],
-        ]
-
-        for ch_num, ch_name, ch_type, ch_color in zip(
-            ch_nums, ch_names, ch_types, ch_colors
-        ):
-            if ch_num < cells.shape[0]:
-                channel = cells[ch_num, :, :, :]
-            else:
-                channel = np.zeros([1, 1, 1])
-
-            if ch_name not in layer_names:
-                ch = viewer.add_image(channel, name=ch_name)
-            else:
-                ch = viewer.layers[ch_name]
-                ch.image = channel
-
-            ch.colormap = Colormap([(0, 0, 0, 1), ch_color])
-            ch.clim = get_default_range(channel, ch_type)
-            ch.blending = "additive"
-
-        # for this case, annotations are only 2D
-        if os.path.exists(im_labels_path):
-            labels = imread(im_labels_path)
-        else:
-            labels = np.zeros(cells[0, 0, :, :].shape, dtype=np.int)
+        viewer, layer_names, labels = im_loader(viewer, im_path, im_labels_path)
 
         if "annotations" not in layer_names:
             annotations_layer = viewer.add_labels(

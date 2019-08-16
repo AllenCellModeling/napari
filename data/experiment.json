@@ -1,8 +1,10 @@
 {
 	"annotator": "user",
-	"data_csv": "./data/20190520_napari_annotation_files.csv",
-	"data_dir_local": "./data/images",
+	"data_csv": "./images_split1.csv",
+	"data_dir_local": null,
 	"save_dir": "./data/annotations",
 	"start_from_last_annotation": 1,
-	"save_if_empty": 0
+	"save_if_empty": 0,
+    "os": "linux",
+    "im_loader": "assay_dev_images_downsampled"
 }
