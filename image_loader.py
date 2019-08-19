@@ -79,11 +79,11 @@ def assay_dev_images_downsampled(viewer, im_path, im_labels_path):
     ch_types = ["fluor", "fluor", "bf", "fluor", "bf", "fluor"]
     ch_colors = [
         [1.0, 0.0, 0.0, 1.0],
-        [1.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 1.0],
         [1.0, 1.0, 1.0, 1.0],
         [0.0, 1.0, 0.0, 1.0],
         [1.0, 1.0, 1.0, 1.0],
-        [0.0, 0.0, 1.0, 1.0]
+        [1.0, 1.0, 1.0, 0.0]
     ]
 
     for i in [0, 1, 2, 3, 5]:  # skipping 4th channel which is a duplicate  brightfield channel
